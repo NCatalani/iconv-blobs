@@ -2,47 +2,25 @@
 #
 # Bash wrapper to process big files with iconv
 
-readonly BLOB_SIZE=$((1024 * 1024 * 100))
+readonly BLOB_SIZE="100M"
 
 ShowUsage() {
     echo "Usage: $0 [iconv_options...] [files...]"
 }
 
-CreateTmp() {
-    local tmp
-
-    tmp=$(mktemp) || exit 1
-
-    echo "$tmp"
-}
-
-RemoveTmp() {
-    local tmp
-
-    tmp=$1
-    
-    rm -f "$tmp" || exit 1
-}
-
 BlobAndRun() {
     local file
-    local filesize 
-    local linesize
-    local tmp 
 
-    file=$1
-    filesize=0
-    tmp=$(CreateTmp)
+    file="$1"
 
-    while IFS= read -r line; do
-        linesize=$(echo "$line" | wc -c)
-        echo "$line" >> "$tmp"
-        (( filesize += linesize )) 
+    split - -d --line-bytes="$BLOB_SIZE" blob < "$file"
 
-        (( filesize >= BLOB_SIZE )) && RunIconv "$tmp" && RemoveTmp "$tmp" && tmp=$(CreateTmp) && filesize=0
-    done < "$file"
-    
-    (( filesize > 0)) && RunIconv "$tmp" && RemoveTmp "$tmp"
+    ls blob* | while read blob
+    do
+        RunIconv "$blob"
+    done
+
+    rm blob*
 }
 
 RunIconv() {
